@@ -1,0 +1,16 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  unit-test:
+    name: "Unit Test"
+    uses: dosquad/actions/.github/workflows/unit-test.yml@main
+    secrets: inherit
+    with:
+      platforms: 'linux/amd64,linux/arm64'
