@@ -3,4 +3,4 @@
 
 cd /etc/weewx || exit 1
 
-exec /app/weewx/bin/weewxd
+exec /lsiopy/bin/weewxd
