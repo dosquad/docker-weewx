@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bash
 # shellcheck shell=bash
 
-cd /home/abc
+cd /etc/weewx || exit 1
 
-exec /usr/local/bin/weewxd
+exec /app/weewx/bin/weewxd
