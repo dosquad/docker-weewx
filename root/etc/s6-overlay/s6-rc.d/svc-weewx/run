@@ -1,0 +1,6 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+cd /home/abc
+
+exec /usr/local/bin/weewxd
