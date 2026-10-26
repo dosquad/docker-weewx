@@ -8,6 +8,14 @@ if [[ ! -e "/etc/weewx/skins/neowx-material" ]]; then
     cp -a /etc/dist-weewx/skins/neowx-material /etc/weewx/skins/ || exit 1
 fi
 
+# Supply the skin helpers to existing installations without replacing custom files.
+mkdir -p /etc/weewx/bin/user || exit 1
+for helper in historygenerator.py openmeteo.py updatecheck.py onlinecheck.py panelorder.py; do
+    if [[ ! -e "/etc/weewx/bin/user/$helper" ]]; then
+        cp -a "/etc/dist-weewx/bin/user/$helper" /etc/weewx/bin/user/ || exit 1
+    fi
+done
+
 if [[ -f "/etc/weewx/weewx.conf" ]]; then
     exit 0
 fi
