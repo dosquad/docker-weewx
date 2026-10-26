@@ -9,6 +9,7 @@ FROM baseimage-${TARGETARCH}
 ARG BUILD_DATE
 ARG VERSION
 ARG WEEWX_RELEASE=v5.5.2
+ARG NEOWX_MATERIAL_RELEASE=1.11
 LABEL build_version="Linuxserver.io version:- ${VERSION} Build-date:- ${BUILD_DATE}"
 LABEL maintainer="na4ma4"
 
@@ -66,6 +67,13 @@ RUN \
 
 RUN weectl station create --no-prompt /etc/weewx && \
   weectl extension install --yes https://github.com/weewx-contrib/weewx-gw1000/archive/refs/heads/master.zip && \
+  # Install only the skin files: the upstream installer changes report configuration.
+  curl -fsSL \
+    "https://github.com/neoground/neowx-material/releases/download/${NEOWX_MATERIAL_RELEASE}/neowx-material-${NEOWX_MATERIAL_RELEASE}.zip" \
+    -o /tmp/neowx-material.zip && \
+  python3 -m zipfile -e /tmp/neowx-material.zip /tmp/neowx-material && \
+  cp -a /tmp/neowx-material/dist/skins/neowx-material /etc/weewx/skins/ && \
+  rm -rf /tmp/neowx-material /tmp/neowx-material.zip && \
   rm -f /etc/weewx/weewx.conf.* && \
   cp -a /etc/weewx/. /etc/dist-weewx/
 
