@@ -1,12 +1,13 @@
 name: "Docker Release"
 
 on:
-  pull_request:
   push:
-    branches:
-      - 'main'
     tags:
       - '*'
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   docker:
@@ -15,5 +16,7 @@ jobs:
     with:
       image: ghcr.io/dosquad/weewx
       platforms: 'linux/amd64,linux/arm64'
-      latest-on-branch: '{{is_default_branch}}'
+      enable-tag-semver: true
+      enable-tag-shortsemver: true
+      latest: 'auto'
     secrets: inherit

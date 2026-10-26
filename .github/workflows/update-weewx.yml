@@ -1,0 +1,95 @@
+name: Update WeeWX
+
+on:
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-weewx
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check update token
+        env:
+          UPDATE_TOKEN: ${{ secrets.WEEWX_UPDATE_TOKEN }}
+        run: |
+          if [ -z "$UPDATE_TOKEN" ]; then
+            echo '::error::Set the WEEWX_UPDATE_TOKEN repository secret (Contents: read and write).'
+            exit 1
+          fi
+
+      - name: Update the pinned stable release
+        uses: actions/github-script@v9
+        with:
+          # A PAT allows this commit to trigger CI and Docker Release.
+          github-token: ${{ secrets.WEEWX_UPDATE_TOKEN }}
+          script: |
+            const { data: release } = await github.rest.repos.getLatestRelease({
+              owner: 'weewx', repo: 'weewx',
+            });
+            const tag = release.tag_name;
+            if (release.draft || release.prerelease || !/^v?\d+\.\d+\.\d+$/.test(tag)) {
+              throw new Error(`Expected a stable WeeWX version, received: ${tag}`);
+            }
+
+            const branch = 'main';
+            const path = 'Dockerfile';
+            const { data: head } = await github.rest.repos.getBranch({
+              ...context.repo, branch,
+            });
+            let commitSha = head.commit.sha;
+            const { data: file } = await github.rest.repos.getContent({
+              ...context.repo, path, ref: commitSha,
+            });
+            if (file.type !== 'file' || file.encoding !== 'base64') {
+              throw new Error('Expected a base64-encoded Dockerfile');
+            }
+            const source = Buffer.from(file.content, 'base64').toString('utf8');
+            const pattern = /^ARG WEEWX_RELEASE=(v?\d+\.\d+\.\d+)$/gm;
+            const matches = [...source.matchAll(pattern)];
+            if (matches.length !== 1) {
+              throw new Error('Expected exactly one pinned WEEWX_RELEASE in Dockerfile');
+            }
+            const current = matches[0][1];
+            const version = value => value.replace(/^v/, '').split('.').map(Number);
+            const currentVersion = version(current);
+            const difference = version(tag).map((part, i) => part - currentVersion[i])
+              .find(part => part !== 0) || 0;
+            if (difference < 0) {
+              core.info(`Skipping downgrade from ${current} to ${tag}.`);
+              return;
+            }
+            if (difference > 0) {
+              const updated = source.replace(pattern, `ARG WEEWX_RELEASE=${tag}`);
+              const { data: update } = await github.rest.repos.createOrUpdateFileContents({
+                ...context.repo, branch, path, sha: file.sha,
+                message: `chore: update WeeWX to ${tag}`,
+                content: Buffer.from(updated).toString('base64'),
+              });
+              commitSha = update.commit.sha;
+              core.info(`Updated WeeWX from ${current} to ${tag}.`);
+            }
+
+            // Also recover a missing tag if a previous run committed but failed to tag.
+            const releaseTag = `v${tag.replace(/^v/, '')}`;
+            try {
+              await github.rest.git.getRef({
+                ...context.repo, ref: `tags/${releaseTag}`,
+              });
+              core.info(`${releaseTag} already exists; leaving it unchanged.`);
+              return;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            await github.rest.git.createRef({
+              ...context.repo, ref: `refs/tags/${releaseTag}`, sha: commitSha,
+            });
+            core.info(`Created ${releaseTag} at ${commitSha}; the tag triggers versioned image builds.`);
