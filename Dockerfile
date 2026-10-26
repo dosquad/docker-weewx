@@ -8,7 +8,7 @@ FROM baseimage-${TARGETARCH}
 # set version label
 ARG BUILD_DATE
 ARG VERSION
-ARG WEEWX_RELEASE=v5.1.0
+ARG WEEWX_RELEASE=v5.5.2
 LABEL build_version="Linuxserver.io version:- ${VERSION} Build-date:- ${BUILD_DATE}"
 LABEL maintainer="na4ma4"
 
