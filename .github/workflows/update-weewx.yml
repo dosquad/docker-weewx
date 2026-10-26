@@ -42,8 +42,12 @@ jobs:
 
             const branch = 'main';
             const path = 'Dockerfile';
+            const { data: head } = await github.rest.repos.getBranch({
+              ...context.repo, branch,
+            });
+            let commitSha = head.commit.sha;
             const { data: file } = await github.rest.repos.getContent({
-              ...context.repo, path, ref: branch,
+              ...context.repo, path, ref: commitSha,
             });
             if (file.type !== 'file' || file.encoding !== 'base64') {
               throw new Error('Expected a base64-encoded Dockerfile');
@@ -59,14 +63,33 @@ jobs:
             const currentVersion = version(current);
             const difference = version(tag).map((part, i) => part - currentVersion[i])
               .find(part => part !== 0) || 0;
-            if (difference <= 0) {
-              core.info(`WeeWX ${current} is already current (latest release: ${tag}).`);
+            if (difference < 0) {
+              core.info(`Skipping downgrade from ${current} to ${tag}.`);
               return;
             }
-            const updated = source.replace(pattern, `ARG WEEWX_RELEASE=${tag}`);
-            await github.rest.repos.createOrUpdateFileContents({
-              ...context.repo, branch, path, sha: file.sha,
-              message: `chore: update WeeWX to ${tag}`,
-              content: Buffer.from(updated).toString('base64'),
+            if (difference > 0) {
+              const updated = source.replace(pattern, `ARG WEEWX_RELEASE=${tag}`);
+              const { data: update } = await github.rest.repos.createOrUpdateFileContents({
+                ...context.repo, branch, path, sha: file.sha,
+                message: `chore: update WeeWX to ${tag}`,
+                content: Buffer.from(updated).toString('base64'),
+              });
+              commitSha = update.commit.sha;
+              core.info(`Updated WeeWX from ${current} to ${tag}.`);
+            }
+
+            // Also recover a missing tag if a previous run committed but failed to tag.
+            const releaseTag = `v${tag.replace(/^v/, '')}`;
+            try {
+              await github.rest.git.getRef({
+                ...context.repo, ref: `tags/${releaseTag}`,
+              });
+              core.info(`${releaseTag} already exists; leaving it unchanged.`);
+              return;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            await github.rest.git.createRef({
+              ...context.repo, ref: `refs/tags/${releaseTag}`, sha: commitSha,
             });
-            core.info(`Updated WeeWX from ${current} to ${tag}; the commit triggers the existing builds.`);
+            core.info(`Created ${releaseTag} at ${commitSha}; the tag triggers versioned image builds.`);
