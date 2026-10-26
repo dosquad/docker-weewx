@@ -1,6 +1,13 @@
 #!/usr/bin/with-contenv bash
 # shellcheck shell=bash
 
+# Make the optional skin available to existing installations without changing
+# report configuration or replacing a user's customized skin.
+if [[ ! -e "/etc/weewx/skins/neowx-material" ]]; then
+    mkdir -p /etc/weewx/skins || exit 1
+    cp -a /etc/dist-weewx/skins/neowx-material /etc/weewx/skins/ || exit 1
+fi
+
 if [[ -f "/etc/weewx/weewx.conf" ]]; then
     exit 0
 fi
