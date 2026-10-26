@@ -65,7 +65,7 @@ RUN \
     ${HOME}/.cache
 
 RUN weectl station create --no-prompt /etc/weewx && \
-  weectl extension install --yes https://github.com/gjr80/weewx-gw1000/releases/latest/download/gw1000.zip && \
+  weectl extension install --yes https://github.com/weewx-contrib/weewx-gw1000/archive/refs/heads/master.zip && \
   rm -f /etc/weewx/weewx.conf.* && \
   cp -a /etc/weewx/. /etc/dist-weewx/
 
